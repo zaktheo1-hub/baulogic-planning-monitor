@@ -19,16 +19,18 @@ def _format_address(app: dict) -> str:
 # Per-borough planning portal search URLs. The app number gets appended
 # as a search query — the user lands on a results page with their
 # application at the top, then clicks through.
-BOROUGH_PORTAL_SEARCH: dict[str, str] = {
-    "Westminster": (
-        "https://idoxpa.westminster.gov.uk/online-applications/"
-        "simpleSearchResults.do?action=firstPage&searchType=Application"
-        "&caseNo="
-    ),
-    "Kensington & Chelsea": (
-        "https://www.rbkc.gov.uk/planning/searches/results.aspx?"
-        "type=Application&ref="
-    ),
+# Westminster uses Idox Public Access. Their keyword search (searchCriteria.simpleSearchString)
+# is the most forgiving endpoint — it accepts the raw application reference and lands
+# the user on a results page with their application as the only hit.
+# K&C also uses Idox now (migrated from their legacy portal), same pattern.
+IDOX_KEYWORD_SEARCH_TEMPLATE = (
+    "{base}/online-applications/simpleSearchResults.do?action=firstPage"
+    "&searchType=Application&searchCriteria.simpleSearchString={ref}"
+)
+
+BOROUGH_PORTAL_BASE: dict[str, str] = {
+    "Westminster": "https://idoxpa.westminster.gov.uk",
+    "Kensington & Chelsea": "https://www.rbkc.gov.uk/planning2",
 }
 
 
