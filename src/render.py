@@ -23,14 +23,12 @@ def _format_address(app: dict) -> str:
 # is the most forgiving endpoint — it accepts the raw application reference and lands
 # the user on a results page with their application as the only hit.
 # K&C also uses Idox now (migrated from their legacy portal), same pattern.
-IDOX_KEYWORD_SEARCH_TEMPLATE = (
-    "{base}/online-applications/simpleSearchResults.do?action=firstPage"
-    "&searchType=Application&searchCriteria.simpleSearchString={ref}"
-)
-
-BOROUGH_PORTAL_BASE: dict[str, str] = {
-    "Westminster": "https://idoxpa.westminster.gov.uk",
-    "Kensington & Chelsea": "https://www.rbkc.gov.uk/planning2",
+# Each borough's planning portal homepage. We don't try to deep-link — Idox
+# uses session-based search and stable per-application URLs aren't reliable.
+# Instead we send the user to the search page and they paste the ref.
+BOROUGH_PORTAL_HOME: dict[str, str] = {
+    "Westminster": "https://idoxpa.westminster.gov.uk/online-applications/",
+    "Kensington & Chelsea": "https://www.rbkc.gov.uk/planning/searches/default.aspx?search=true",
 }
 
 
