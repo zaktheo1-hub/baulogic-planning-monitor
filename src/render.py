@@ -46,10 +46,12 @@ def _planning_portal_url(app: dict) -> str | None:
     if not app_no or not lpa:
         return None
 
-    # 2. Borough-specific search URL with the app number pre-filled.
-    search_base = BOROUGH_PORTAL_SEARCH.get(lpa)
-    if search_base:
-        return f"{search_base}{app_no}"
+    # 2. Borough-specific Idox keyword search (URL-encode the ref).
+    from urllib.parse import quote
+    base = BOROUGH_PORTAL_BASE.get(lpa)
+    if base:
+        encoded_ref = quote(app_no, safe="")
+        return IDOX_KEYWORD_SEARCH_TEMPLATE.format(base=base, ref=encoded_ref)
 
     # 3. Fall back to a Google search (better than nothing for unknown boroughs).
     query = f"{lpa} planning {app_no}".replace(" ", "+")
