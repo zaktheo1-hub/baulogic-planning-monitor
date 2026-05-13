@@ -1,0 +1,111 @@
+name: PLD API Recon
+
+on:
+  workflow_dispatch:  # manual trigger only
+
+jobs:
+  recon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install requests
+        run: pip install requests
+
+      - name: Probe the PLD API
+        run: |
+          python << 'EOF'
+          import requests
+          import json
+          from datetime import datetime, timedelta
+
+          URL = "https://planningdata.london.gov.uk/api-guest/applications/_search"
+          HEADERS = {
+              "X-API-AllowRequest": "be2rmRnt&",
+              "Content-Type": "application/json",
+              "User-Agent": "BaulogicPlanningMonitor/0.1",
+          }
+
+          since = (datetime.now() - timedelta(days=30)).strftime("%d/%m/%Y")
+          print(f"Looking back to: {since}\n")
+
+          # ----- TEST 1: Westminster + K&C, last 30 days -----
+          print("=" * 70)
+          print("TEST 1: Westminster + Kensington and Chelsea, last 30 days")
+          print("=" * 70)
+          query = {
+              "size": 3,
+              "query": {
+                  "bool": {
+                      "must": [
+                          {
+                              "bool": {
+                                  "should": [
+                                      {"term": {"lpa_name.raw": "Westminster"}},
+                                      {"term": {"lpa_name.raw": "Kensington and Chelsea"}},
+                                  ]
+                              }
+                          },
+                          {"range": {"valid_date": {"gte": since}}},
+                      ]
+                  }
+              },
+          }
+          r = requests.post(URL, headers=HEADERS, json=query, timeout=30)
+          print(f"Status: {r.status_code}")
+          if r.status_code == 200:
+              data = r.json()
+              total = data.get("hits", {}).get("total", {})
+              print(f"Total matching applications: {total}")
+              print(f"\nFirst 3 results (FULL payload — we want to see every field):\n")
+              for i, hit in enumerate(data.get("hits", {}).get("hits", []), 1):
+                  print(f"\n--- Result {i} ---")
+                  print(json.dumps(hit.get("_source", {}), indent=2, default=str)[:2500])
+          else:
+              print(f"Body: {r.text[:500]}")
+
+          # ----- TEST 2: confirm borough name spellings -----
+          print("\n" + "=" * 70)
+          print("TEST 2: What borough names actually exist in the data?")
+          print("=" * 70)
+          agg_query = {
+              "size": 0,
+              "aggs": {
+                  "boroughs": {
+                      "terms": {"field": "lpa_name.raw", "size": 40}
+                  }
+              },
+          }
+          r = requests.post(URL, headers=HEADERS, json=agg_query, timeout=30)
+          if r.status_code == 200:
+              buckets = r.json().get("aggregations", {}).get("boroughs", {}).get("buckets", [])
+              print(f"Boroughs found ({len(buckets)}):")
+              for b in buckets:
+                  print(f"  - {b['key']}  ({b['doc_count']:,} applications)")
+          else:
+              print(f"Status: {r.status_code}, Body: {r.text[:300]}")
+
+          # ----- TEST 3: what application types exist? -----
+          print("\n" + "=" * 70)
+          print("TEST 3: What application types exist?")
+          print("=" * 70)
+          agg_query = {
+              "size": 0,
+              "aggs": {
+                  "types": {
+                      "terms": {"field": "application_type.raw", "size": 30}
+                  }
+              },
+          }
+          r = requests.post(URL, headers=HEADERS, json=agg_query, timeout=30)
+          if r.status_code == 200:
+              buckets = r.json().get("aggregations", {}).get("types", {}).get("buckets", [])
+              print(f"Application types found ({len(buckets)}):")
+              for b in buckets:
+                  print(f"  - {b['key']}  ({b['doc_count']:,})")
+          else:
+              print(f"Status: {r.status_code}, Body: {r.text[:300]}")
+          EOF
