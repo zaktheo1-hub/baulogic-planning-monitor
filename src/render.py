@@ -33,27 +33,24 @@ BOROUGH_PORTAL_HOME: dict[str, str] = {
 
 
 def _planning_portal_url(app: dict) -> str | None:
-    """Return the best available link to the borough's planning portal."""
-    # 1. If the PLD record has a direct URL, trust it.
+    """Return the borough's planning portal search homepage.
+    The user pastes the application reference into the search box."""
     direct = app.get("url_planning_app")
     if direct:
         return direct
-
-    app_no = app.get("lpa_app_no")
     lpa = app.get("lpa_name")
-    if not app_no or not lpa:
+    return BOROUGH_PORTAL_HOME.get(lpa)
+
+
+def _google_maps_url(app: dict) -> str | None:
+    """A Google Maps link to the application location. Postcode-only is
+    enough for prime central London — these are short postcodes covering
+    small geographic areas."""
+    postcode = app.get("postcode")
+    if not postcode:
         return None
-
-    # 2. Borough-specific Idox keyword search (URL-encode the ref).
     from urllib.parse import quote
-    base = BOROUGH_PORTAL_BASE.get(lpa)
-    if base:
-        encoded_ref = quote(app_no, safe="")
-        return IDOX_KEYWORD_SEARCH_TEMPLATE.format(base=base, ref=encoded_ref)
-
-    # 3. Fall back to a Google search (better than nothing for unknown boroughs).
-    query = f"{lpa} planning {app_no}".replace(" ", "+")
-    return f"https://www.google.com/search?q={query}"
+    return f"https://www.google.com/maps/search/?api=1&query={quote(postcode)}"
 
 
 def _score_colour(total: int) -> str:
@@ -119,12 +116,19 @@ def render_html(apps: list[dict], days_back: int) -> str:
 
         colour = _score_colour(score["total"])
 
-        portal_link = (
-            f'<a href="{escape(portal_url)}" style="color: #2563eb; text-decoration: none;">'
-            f'View application →</a>'
-            if portal_url
-            else ""
-        )
+        maps_url = _google_maps_url(app)
+        links = []
+        if maps_url:
+            links.append(
+                f'<a href="{escape(maps_url)}" style="color: #2563eb; text-decoration: none;">'
+                f'📍 Map</a>'
+            )
+        if portal_url:
+            links.append(
+                f'<a href="{escape(portal_url)}" style="color: #2563eb; text-decoration: none;">'
+                f'Search on {escape(app.get("lpa_name", ""))} portal →</a>'
+            )
+        portal_link = " &nbsp;·&nbsp; ".join(links)
 
         signal_chips = ""
         for sig in new_build_matches[:3]:
