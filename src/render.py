@@ -16,18 +16,42 @@ def _format_address(app: dict) -> str:
     return ", ".join(p.strip() for p in parts if p and p.strip())
 
 
+# Per-borough planning portal search URLs. The app number gets appended
+# as a search query — the user lands on a results page with their
+# application at the top, then clicks through.
+BOROUGH_PORTAL_SEARCH: dict[str, str] = {
+    "Westminster": (
+        "https://idoxpa.westminster.gov.uk/online-applications/"
+        "simpleSearchResults.do?action=firstPage&searchType=Application"
+        "&caseNo="
+    ),
+    "Kensington & Chelsea": (
+        "https://www.rbkc.gov.uk/planning/searches/results.aspx?"
+        "type=Application&ref="
+    ),
+}
+
+
 def _planning_portal_url(app: dict) -> str | None:
-    """If the PLD record has a direct URL to the borough's planning portal,
-    use it. Otherwise fall back to a Google search for the application ref."""
+    """Return the best available link to the borough's planning portal."""
+    # 1. If the PLD record has a direct URL, trust it.
     direct = app.get("url_planning_app")
     if direct:
         return direct
+
     app_no = app.get("lpa_app_no")
     lpa = app.get("lpa_name")
-    if app_no and lpa:
-        query = f"{lpa} planning {app_no}".replace(" ", "+")
-        return f"https://www.google.com/search?q={query}"
-    return None
+    if not app_no or not lpa:
+        return None
+
+    # 2. Borough-specific search URL with the app number pre-filled.
+    search_base = BOROUGH_PORTAL_SEARCH.get(lpa)
+    if search_base:
+        return f"{search_base}{app_no}"
+
+    # 3. Fall back to a Google search (better than nothing for unknown boroughs).
+    query = f"{lpa} planning {app_no}".replace(" ", "+")
+    return f"https://www.google.com/search?q={query}"
 
 
 def _score_colour(total: int) -> str:
